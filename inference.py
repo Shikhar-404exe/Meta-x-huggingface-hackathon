@@ -29,6 +29,35 @@ def _emit(tag: str, payload: Dict[str, Any]) -> None:
     # Structured stdout logs for evaluator parsing.
     print(f"[{tag}] {json.dumps(payload, separators=(',', ':'), ensure_ascii=True)}")
 
+
+def log_start(task: str, env: str, model: str) -> None:
+    _emit("START", {"task": task, "env": env, "model": model})
+
+
+def log_step(step: int, action: str, reward: float, done: bool, error: str | None) -> None:
+    _emit(
+        "STEP",
+        {
+            "step": step,
+            "action": action,
+            "reward": round(float(reward), 4),
+            "done": bool(done),
+            "error": error,
+        },
+    )
+
+
+def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
+    _emit(
+        "END",
+        {
+            "success": bool(success),
+            "steps": int(steps),
+            "score": round(float(score), 4),
+            "rewards": [round(float(r), 4) for r in rewards],
+        },
+    )
+
 SYSTEM_PROMPT = """You are an attention-economy feed curator agent.
 You must return ONLY valid JSON with this schema:
 {
@@ -129,11 +158,12 @@ def _llm_action(obs: Dict[str, Any]) -> Dict[str, Any]:
         data.setdefault("strategy", None)
         data.setdefault("rationale", "")
         return data
-    except Exception:
+    except Exception as exc:
+        print(f"[DEBUG] Model request failed: {exc}", flush=True)
         return _heuristic_action(obs)
 
 
-def _run_task(task_id: str, seed: int = 42) -> float:
+def _run_task(task_id: str, seed: int = 42, step_offset: int = 0) -> tuple[float, int, list[float]]:
     reset_resp = requests.post(
         f"{ENV_URL}/reset",
         json={"task_id": task_id, "seed": seed},
@@ -144,6 +174,7 @@ def _run_task(task_id: str, seed: int = 42) -> float:
 
     done = False
     safety_guard = 0
+    rewards: list[float] = []
     while not done and safety_guard < 100:
         safety_guard += 1
         action = _llm_action(obs)
@@ -159,16 +190,9 @@ def _run_task(task_id: str, seed: int = 42) -> float:
         done = bool(payload["done"])
 
         reward_value = payload.get("reward", {}).get("value", 0.0)
-        _emit(
-            "STEP",
-            {
-                "task_id": task_id,
-                "step": safety_guard,
-                "action_type": action.get("action_type"),
-                "done": done,
-                "reward": round(float(reward_value), 4),
-            },
-        )
+        rewards.append(float(reward_value))
+        action_str = json.dumps(action, separators=(",", ":"), ensure_ascii=True)
+        log_step(step=step_offset + safety_guard, action=action_str, reward=float(reward_value), done=done, error=None)
 
     state_resp = requests.get(f"{ENV_URL}/state", params={"task_id": task_id}, timeout=30)
     state_resp.raise_for_status()
@@ -188,28 +212,25 @@ def _run_task(task_id: str, seed: int = 42) -> float:
     else:
         score = 0.30 * metrics["engagement"] + 0.25 * metrics["productivity"] + 0.45 * metrics["wellbeing"] - (0.12 * unsafe + 0.05 * loops)
 
-    return round(max(0.0, min(1.0, score)), 4)
+    return round(max(0.0, min(1.0, score)), 4), safety_guard, rewards
 
 
 def main() -> None:
     health = requests.get(f"{ENV_URL}/health", timeout=15)
     health.raise_for_status()
 
-    _emit(
-        "START",
-        {
-            "env_url": ENV_URL,
-            "api_base_url": API_BASE_URL,
-            "model_name": MODEL,
-            "tasks": ["easy", "medium", "hard"],
-            "seed": 42,
-        },
-    )
+    task_name = "all_tasks"
+    benchmark = "attention-economy-simulator"
+    log_start(task=task_name, env=benchmark, model=MODEL)
 
     scores = {}
+    all_step_rewards: list[float] = []
+    total_steps = 0
     for task_id in ["easy", "medium", "hard"]:
-        score = _run_task(task_id=task_id, seed=42)
+        score, steps_taken, rewards = _run_task(task_id=task_id, seed=42, step_offset=total_steps)
         scores[task_id] = score
+        total_steps += steps_taken
+        all_step_rewards.extend(rewards)
 
     overall = round(sum(scores.values()) / 3.0, 4)
     scores["overall"] = overall
@@ -217,13 +238,9 @@ def main() -> None:
     with open("baseline_scores.json", "w", encoding="utf-8") as f:
         json.dump(scores, f, indent=2)
 
-    _emit(
-        "END",
-        {
-            "scores": scores,
-            "output_file": "baseline_scores.json",
-        },
-    )
+    # Success threshold for summary logging only.
+    success = overall >= 0.2
+    log_end(success=success, steps=total_steps, score=overall, rewards=all_step_rewards)
 
 
 if __name__ == "__main__":

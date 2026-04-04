@@ -144,6 +144,12 @@ Run local pre-submit validator:
 python scripts/pre_submit_validate.py
 ```
 
+Sample-style shell validator (Linux/macOS):
+
+```bash
+bash scripts/pre_submit_validate.sh
+```
+
 The validator checks:
 
 - API health and endpoint behavior (`/health`, `/reset`, `/step`, `/state`, `/tasks`)
