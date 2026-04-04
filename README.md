@@ -117,6 +117,7 @@ python inference.py
 ```
 
 Outputs per-task scores and writes `baseline_scores.json`.
+The script also emits structured stdout events in `[START]`, `[STEP]`, and `[END]` format for evaluator parsing.
 
 ### Baseline scores (`inference.py`, seed=42)
 

@@ -24,6 +24,11 @@ if not API_KEY:
 client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
 MODEL = MODEL_NAME
 
+
+def _emit(tag: str, payload: Dict[str, Any]) -> None:
+    # Structured stdout logs for evaluator parsing.
+    print(f"[{tag}] {json.dumps(payload, separators=(',', ':'), ensure_ascii=True)}")
+
 SYSTEM_PROMPT = """You are an attention-economy feed curator agent.
 You must return ONLY valid JSON with this schema:
 {
@@ -153,6 +158,18 @@ def _run_task(task_id: str, seed: int = 42) -> float:
         obs = payload["observation"]
         done = bool(payload["done"])
 
+        reward_value = payload.get("reward", {}).get("value", 0.0)
+        _emit(
+            "STEP",
+            {
+                "task_id": task_id,
+                "step": safety_guard,
+                "action_type": action.get("action_type"),
+                "done": done,
+                "reward": round(float(reward_value), 4),
+            },
+        )
+
     state_resp = requests.get(f"{ENV_URL}/state", params={"task_id": task_id}, timeout=30)
     state_resp.raise_for_status()
     state = state_resp.json()
@@ -178,21 +195,35 @@ def main() -> None:
     health = requests.get(f"{ENV_URL}/health", timeout=15)
     health.raise_for_status()
 
+    _emit(
+        "START",
+        {
+            "env_url": ENV_URL,
+            "api_base_url": API_BASE_URL,
+            "model_name": MODEL,
+            "tasks": ["easy", "medium", "hard"],
+            "seed": 42,
+        },
+    )
+
     scores = {}
     for task_id in ["easy", "medium", "hard"]:
         score = _run_task(task_id=task_id, seed=42)
         scores[task_id] = score
-        print(f"{task_id}: {score:.4f}")
 
     overall = round(sum(scores.values()) / 3.0, 4)
     scores["overall"] = overall
 
-    print(f"overall: {overall:.4f}")
-
     with open("baseline_scores.json", "w", encoding="utf-8") as f:
         json.dump(scores, f, indent=2)
 
-    print("Wrote baseline_scores.json")
+    _emit(
+        "END",
+        {
+            "scores": scores,
+            "output_file": "baseline_scores.json",
+        },
+    )
 
 
 if __name__ == "__main__":
