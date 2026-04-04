@@ -1,0 +1,114 @@
+name: attention-economy-simulator
+version: "1.0.0"
+description: >
+  Real-world OpenEnv environment that simulates digital feed curation.
+  An AI agent must optimize engagement, productivity, and long-term wellbeing
+  under constrained session time and risk from addictive/toxic content.
+author: Shikhar9000
+license: MIT
+tags:
+  - openenv
+  - recommendation-systems
+  - digital-wellbeing
+  - real-world
+  - reinforcement-learning
+
+api:
+  reset: POST /reset
+  step: POST /step
+  state: GET /state
+  tasks: GET /tasks
+  health: GET /health
+
+observation_space:
+  type: object
+  fields:
+    task_id: { type: string }
+    task_description: { type: string }
+    seed: { type: integer }
+    session_step: { type: integer }
+    max_steps: { type: integer }
+    time_remaining: { type: integer }
+    user_mood:
+      type: enum
+      values: [bored, focused, tired, overstimulated, calm]
+    energy: { type: float, range: [0.0, 1.0] }
+    addiction_level: { type: float, range: [0.0, 1.0] }
+    fatigue: { type: float, range: [0.0, 1.0] }
+    engagement: { type: float, range: [0.0, 1.0] }
+    productivity: { type: float, range: [0.0, 1.0] }
+    wellbeing: { type: float, range: [0.0, 1.0] }
+    blocked_categories: { type: array }
+    feed_items: { type: array }
+    recent_actions: { type: array }
+    done: { type: boolean }
+    message: { type: string }
+
+action_space:
+  type: object
+  fields:
+    action_type:
+      type: enum
+      values: [recommend_item, block_category, suggest_break, reorder_feed]
+    item_id: { type: integer, nullable: true }
+    category:
+      type: enum
+      values: [entertainment, educational, news, social, toxic]
+      nullable: true
+    break_minutes: { type: integer, nullable: true }
+    strategy:
+      type: enum
+      values:
+        [
+          prioritize_productivity,
+          prioritize_engagement,
+          prioritize_wellbeing,
+          balanced,
+        ]
+      nullable: true
+    rationale: { type: string }
+
+reward:
+  type: object
+  range: [0.0, 1.0]
+  per_step: true
+  components:
+    delta_engagement: weight 0.35
+    delta_productivity: weight 0.35
+    delta_wellbeing: weight 0.30
+  penalties:
+    invalid_action: -0.20
+    repeated_action_loop: -0.08
+    unsafe_toxic_recommendation: -0.20
+
+tasks:
+  - id: easy
+    name: Healthy Engagement Basics
+    difficulty: easy
+    max_steps: 14
+    description: Maintain engagement while keeping addiction low.
+  - id: medium
+    name: Balanced Feed Curation
+    difficulty: medium
+    max_steps: 18
+    description: Balance engagement and productivity with diversity.
+  - id: hard
+    name: Long-Horizon Wellbeing Recovery
+    difficulty: hard
+    max_steps: 24
+    description: Recover wellbeing under high addiction and fatigue pressure.
+
+runtime:
+  framework: fastapi
+  port: 7860
+  docker: true
+  vcpu: 2
+  memory: 8gb
+
+baseline:
+  script: inference.py
+  env_vars:
+    - API_BASE_URL
+    - MODEL_NAME
+    - HF_TOKEN
+    - OPENAI_API_KEY
