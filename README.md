@@ -118,16 +118,16 @@ python inference.py
 
 Outputs per-task scores and writes `baseline_scores.json`.
 
-### Baseline scores (deterministic scripted policy)
+### Baseline scores (`inference.py`, seed=42)
 
 | Task    |  Score |
 | ------- | -----: |
-| easy    | 0.3839 |
-| medium  | 0.1981 |
+| easy    | 0.5131 |
+| medium  | 0.1654 |
 | hard    | 0.0000 |
-| overall | 0.1940 |
+| overall | 0.2262 |
 
-These values come from the local deterministic validation run and are reproducible with fixed seed.
+These values come from an actual `inference.py` run against the deployed environment with fixed seed.
 
 ## Tests and validation
 

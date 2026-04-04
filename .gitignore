@@ -13,8 +13,5 @@ venv/
 # Local env/config
 .env
 
-# Generated artifacts
-baseline_scores.json
-
 # IDE
 .vscode/
