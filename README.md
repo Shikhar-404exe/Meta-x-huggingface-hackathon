@@ -120,11 +120,11 @@ Outputs per-task scores and writes `baseline_scores.json`.
 
 ### Baseline scores (deterministic scripted policy)
 
-| Task | Score |
-|------|------:|
-| easy | 0.3839 |
-| medium | 0.1981 |
-| hard | 0.0000 |
+| Task    |  Score |
+| ------- | -----: |
+| easy    | 0.3839 |
+| medium  | 0.1981 |
+| hard    | 0.0000 |
 | overall | 0.1940 |
 
 These values come from the local deterministic validation run and are reproducible with fixed seed.
