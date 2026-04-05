@@ -10,116 +10,87 @@ tags:
   - recommendation-systems
 ---
 
-## Attention Economy Simulator (OpenEnv)
+## Attention Economy Simulator
 
-A real-world OpenEnv environment where an AI agent manages digital feed decisions to balance:
+This project is an OpenEnv benchmark for responsible feed curation.
+
+An AI agent must balance three things at the same time:
 
 - Engagement
 - Productivity
 - Long-term wellbeing
 
-## Why this environment matters
+In simple terms: do not maximize clicks at the cost of user health.
 
-Modern recommendation systems optimize watch time aggressively, often at the expense of user health and focus. This environment models that practical tradeoff so agentic systems can be benchmarked on responsible curation behavior.
+## Project links
 
-## Environment API
+- GitHub: https://github.com/Shikhar-404exe/Meta-x-huggingface-hackathon
+- Hugging Face Space: https://huggingface.co/spaces/Shikhar9000/meta_hack
 
-- `POST /reset` -> returns initial `Observation`
-- `POST /step` -> returns `{observation, reward, done, info}`
-- `GET /state` -> returns current internal state
-- `GET /tasks` -> returns task catalog
-- `GET /health` -> service health check
+## What the API provides
 
-Request compatibility hardening:
+- POST /reset
+- POST /step
+- GET /state
+- GET /tasks
+- GET /health
 
-- `/reset` accepts either query params (`task_id`, `seed`) or JSON body
-- `/step` accepts either wrapped payload (`{"task_id": ..., "action": {...}}`) or direct action JSON
+Compatibility notes:
 
-## Typed spaces
+- /reset accepts query params or JSON body
+- /step accepts wrapped payload or direct action JSON
 
-### Observation
+## Tasks
 
-Observation includes user state (`mood`, `energy`, `addiction_level`, `fatigue`, `engagement`, `productivity`, `wellbeing`), current feed items, blocked categories, and episode counters.
+- easy: Healthy Engagement Basics
+- medium: Balanced Feed Curation
+- hard: Long-Horizon Wellbeing Recovery
 
-### Action
+All graders are deterministic and scores are clamped to 0.0-1.0.
 
-Action schema:
+## Quick start (Windows)
 
-```json
-{
-  "action_type": "recommend_item | block_category | suggest_break | reorder_feed",
-  "item_id": 1002,
-  "category": "toxic",
-  "break_minutes": 8,
-  "strategy": "prioritize_wellbeing",
-  "rationale": "optional short reason"
-}
-```
-
-## Reward function
-
-Dense trajectory reward each step:
-
-- `0.35 * delta_engagement`
-- `0.35 * delta_productivity`
-- `0.30 * delta_wellbeing`
-
-With penalties for invalid/unsafe/repetitive behavior. Final per-step reward is clipped to `[0.0, 1.0]`.
-
-## Tasks and deterministic graders
-
-1. Easy: Healthy Engagement Basics
-   Score objective: engagement high while addiction low.
-
-2. Medium: Balanced Feed Curation
-   Score objective: engagement + productivity + diversity.
-
-3. Hard: Long-Horizon Wellbeing Recovery
-   Score objective: maximize wellbeing under high-risk initial state.
-
-All graders are deterministic with fixed seeds and clamp scores to `0.0-1.0`.
-
-## Local setup
-
-```bash
+```powershell
+cd "C:\Users\shash\Desktop\Meta X HuggingFace Hackathon"
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 uvicorn app:app --host 0.0.0.0 --port 7860
 ```
 
-Copy `.env.example` to `.env` and fill your API values before running `inference.py`.
+Open a second terminal for baseline inference:
 
-## Docker
-
-```bash
-docker build -t attention-economy-simulator .
-docker run -p 7860:7860 attention-economy-simulator
-```
-
-## Baseline inference
-
-`inference.py` is in project root and uses OpenAI client.
-
-Required environment variables:
-
-- `API_BASE_URL`
-- `MODEL_NAME`
-- `HF_TOKEN`
-
-Optional:
-
-- `OPENAI_API_KEY` (fallback)
-- `ENV_URL` (defaults to `http://localhost:7860`)
-
-Run baseline:
-
-```bash
+```powershell
+cd "C:\Users\shash\Desktop\Meta X HuggingFace Hackathon"
+.\.venv\Scripts\Activate.ps1
+$env:ENV_URL="https://shikhar9000-meta-hack.hf.space"
+$env:API_BASE_URL="https://router.huggingface.co/v1"
+$env:MODEL_NAME="meta-llama/Llama-3.1-8B-Instruct"
+$env:HF_TOKEN="<your_hf_token>"
 python inference.py
 ```
 
-Outputs per-task scores and writes `baseline_scores.json`.
-The script also emits structured stdout events in `[START]`, `[STEP]`, and `[END]` format for evaluator parsing.
+## Environment variables used by inference.py
 
-### Baseline scores (`inference.py`, seed=42)
+Required:
+
+- API_BASE_URL
+- MODEL_NAME
+- HF_TOKEN
+
+Optional:
+
+- OPENAI_API_KEY (fallback if HF_TOKEN is not set)
+- ENV_URL (default: http://localhost:7860)
+
+## Validation commands
+
+```powershell
+pytest -q
+python scripts/pre_submit_validate.py
+& ".\.venv\Scripts\openenv.exe" validate
+```
+
+## Baseline result (seed=42)
 
 | Task    |  Score |
 | ------- | -----: |
@@ -128,56 +99,37 @@ The script also emits structured stdout events in `[START]`, `[STEP]`, and `[END
 | hard    | 0.0000 |
 | overall | 0.2262 |
 
-These values come from an actual `inference.py` run against the deployed environment with fixed seed.
+The script writes these values to baseline_scores.json and logs structured events in START/STEP/END format.
 
-## Tests and validation
+## Screenshots
 
-Run unit tests:
+Screenshots can be shown directly in this README.
 
-```bash
-pytest -q
-```
+I added a ready folder: docs/screenshots/
 
-Run local pre-submit validator:
+Save your files with these names:
 
-```bash
-python scripts/pre_submit_validate.py
-```
+- 01-openenv-validate.png
+- 02-pre-submit-validator.png
+- 03-space-status-container.png
+- 04-space-build-log.png
+- 05-inference-start.png
+- 06-inference-end.png
 
-Sample-style shell validator (Linux/macOS):
+Then they will render here automatically:
 
-```bash
-bash scripts/pre_submit_validate.sh
-```
+![OpenEnv validate](docs/screenshots/01-openenv-validate.png)
+![Pre-submit validator](docs/screenshots/02-pre-submit-validator.png)
+![Space status container](docs/screenshots/03-space-status-container.png)
+![Space build log](docs/screenshots/04-space-build-log.png)
+![Inference start](docs/screenshots/05-inference-start.png)
+![Inference end](docs/screenshots/06-inference-end.png)
 
-The validator checks:
+## Submission checklist
 
-- API health and endpoint behavior (`/health`, `/reset`, `/step`, `/state`, `/tasks`)
-- 3+ tasks available
-- Reward range compliance (`0.0-1.0`)
-- Episode termination behavior
-- Deterministic grader outputs
-
-## Hugging Face Space deployment
-
-1. Create a new Docker Space.
-2. Push this repository.
-3. Configure Space variables:
-   - `API_BASE_URL`
-   - `MODEL_NAME`
-4. Configure Space secrets:
-   - `HF_TOKEN`
-   - `OPENAI_API_KEY` (optional fallback)
-5. Ensure the app responds on port `7860`.
-
-Current Space: `https://huggingface.co/spaces/Shikhar9000/meta_hack`
-
-## Pre-submission checklist
-
-- [ ] Space deploys and `/health` returns 200
-- [ ] `/reset`, `/step`, `/state`, `/tasks` behave correctly
-- [ ] `openenv.yaml` present and valid
-- [ ] 3 deterministic tasks + graders with scores in `[0.0, 1.0]`
-- [ ] Docker build and run succeed
-- [ ] `inference.py` runs and outputs reproducible baseline
-- [ ] Runtime suitable for 2 vCPU / 8 GB
+- [x] Environment implemented with typed models and OpenEnv endpoints
+- [x] Three tasks with deterministic graders
+- [x] Baseline inference script with required env vars and START/STEP/END logs
+- [x] Dockerized and deployed on Hugging Face Space
+- [x] openenv validate passes
+- [x] Pre-submit validator passes
