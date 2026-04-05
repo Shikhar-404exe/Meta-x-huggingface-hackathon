@@ -12,15 +12,15 @@ tags:
 
 ## Attention Economy Simulator
 
-This project is an OpenEnv benchmark for responsible feed curation.
+We built this OpenEnv benchmark to test responsible feed curation in a practical, real-world style setting.
 
-An AI agent must balance three things at the same time:
+In this environment, our agent tries to balance three goals at the same time:
 
 - Engagement
 - Productivity
 - Long-term wellbeing
 
-In simple terms: do not maximize clicks at the cost of user health.
+In simple terms, we do not want to maximize clicks at the cost of user health.
 
 ## Project links
 
@@ -35,7 +35,7 @@ In simple terms: do not maximize clicks at the cost of user health.
 - GET /tasks
 - GET /health
 
-Compatibility notes:
+For compatibility:
 
 - /reset accepts query params or JSON body
 - /step accepts wrapped payload or direct action JSON
@@ -46,7 +46,7 @@ Compatibility notes:
 - medium: Balanced Feed Curation
 - hard: Long-Horizon Wellbeing Recovery
 
-All graders are deterministic and scores are clamped to 0.0-1.0.
+We keep grading deterministic, and every score is clamped to 0.0-1.0.
 
 ## Quick start (Windows)
 
@@ -57,7 +57,7 @@ pip install -r requirements.txt
 uvicorn app:app --host 0.0.0.0 --port 7860
 ```
 
-Open a second terminal for baseline inference:
+Then, in a second terminal, we can run baseline inference:
 
 ```powershell
 cd "C:\Users\shash\Desktop\Meta X HuggingFace Hackathon"
@@ -103,27 +103,15 @@ The script writes these values to baseline_scores.json and logs structured event
 
 ## Screenshots
 
-Screenshots can be shown directly in this README.
+We captured the following proof screenshots for submission:
 
-I added a ready folder: docs/screenshots/
+- OpenEnv validate success output
+- pre_submit_validate.py passing output
+- Hugging Face Space running container status
+- Hugging Face Space build logs
+- Inference run finishing with END log
 
-Save your files with these names:
-
-- 01-openenv-validate.png
-- 02-pre-submit-validator.png
-- 03-space-status-container.png
-- 04-space-build-log.png
-- 05-inference-start.png
-- 06-inference-end.png
-
-Then they will render here automatically:
-
-![OpenEnv validate](docs/screenshots/01-openenv-validate.png)
-![Pre-submit validator](docs/screenshots/02-pre-submit-validator.png)
-![Space status container](docs/screenshots/03-space-status-container.png)
-![Space build log](docs/screenshots/04-space-build-log.png)
-![Inference start](docs/screenshots/05-inference-start.png)
-![Inference end](docs/screenshots/06-inference-end.png)
+Note: We are not storing PNG screenshots inside this repository because the Hugging Face Space Git remote rejects binary files unless Xet storage is configured.
 
 ## Submission checklist
 
