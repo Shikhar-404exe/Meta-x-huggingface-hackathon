@@ -5,6 +5,9 @@ on:
     branches: ["**"]
   pull_request:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -24,7 +27,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run unit tests
-        run: pytest -q
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q
 
       - name: Run pre-submit validator
         run: python scripts/pre_submit_validate.py
