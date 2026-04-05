@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from typing import Any, Dict
 
 import requests
@@ -23,6 +24,8 @@ if not API_KEY:
 
 client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
 MODEL = MODEL_NAME
+
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 def _emit(tag: str, payload: Dict[str, Any]) -> None:
@@ -57,6 +60,47 @@ def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> No
             "rewards": [round(float(r), 4) for r in rewards],
         },
     )
+
+
+def _request_with_retry(
+    method: str,
+    path: str,
+    *,
+    timeout: int,
+    max_attempts: int = 4,
+    backoff_seconds: float = 1.0,
+    **kwargs: Any,
+) -> requests.Response:
+    url = f"{ENV_URL}{path}"
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = requests.request(method, url, timeout=timeout, **kwargs)
+            if response.status_code >= 400:
+                if response.status_code in RETRYABLE_STATUS_CODES and attempt < max_attempts:
+                    print(
+                        f"[DEBUG] HTTP {response.status_code} from {path}; retry {attempt}/{max_attempts}",
+                        flush=True,
+                    )
+                    time.sleep(backoff_seconds * (2 ** (attempt - 1)))
+                    continue
+                response.raise_for_status()
+            return response
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+            requests.exceptions.SSLError,
+            requests.exceptions.ChunkedEncodingError,
+        ) as exc:
+            if attempt >= max_attempts:
+                raise
+            print(
+                f"[DEBUG] Request failure on {path}: {exc}; retry {attempt}/{max_attempts}",
+                flush=True,
+            )
+            time.sleep(backoff_seconds * (2 ** (attempt - 1)))
+
+    raise RuntimeError(f"Unreachable retry branch for {method} {path}")
 
 SYSTEM_PROMPT = """You are an attention-economy feed curator agent.
 You must return ONLY valid JSON with this schema:
@@ -164,12 +208,12 @@ def _llm_action(obs: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _run_task(task_id: str, seed: int = 42, step_offset: int = 0) -> tuple[float, int, list[float]]:
-    reset_resp = requests.post(
-        f"{ENV_URL}/reset",
+    reset_resp = _request_with_retry(
+        "POST",
+        "/reset",
         json={"task_id": task_id, "seed": seed},
         timeout=30,
     )
-    reset_resp.raise_for_status()
     obs = reset_resp.json()
 
     done = False
@@ -179,12 +223,12 @@ def _run_task(task_id: str, seed: int = 42, step_offset: int = 0) -> tuple[float
         safety_guard += 1
         action = _llm_action(obs)
 
-        step_resp = requests.post(
-            f"{ENV_URL}/step",
+        step_resp = _request_with_retry(
+            "POST",
+            "/step",
             json={"task_id": task_id, "action": action},
             timeout=30,
         )
-        step_resp.raise_for_status()
         payload = step_resp.json()
         obs = payload["observation"]
         done = bool(payload["done"])
@@ -194,8 +238,7 @@ def _run_task(task_id: str, seed: int = 42, step_offset: int = 0) -> tuple[float
         action_str = json.dumps(action, separators=(",", ":"), ensure_ascii=True)
         log_step(step=step_offset + safety_guard, action=action_str, reward=float(reward_value), done=done, error=None)
 
-    state_resp = requests.get(f"{ENV_URL}/state", params={"task_id": task_id}, timeout=30)
-    state_resp.raise_for_status()
+    state_resp = _request_with_retry("GET", "/state", params={"task_id": task_id}, timeout=30)
     state = state_resp.json()
 
     metrics = state["metrics"]
@@ -216,31 +259,46 @@ def _run_task(task_id: str, seed: int = 42, step_offset: int = 0) -> tuple[float
 
 
 def main() -> None:
-    health = requests.get(f"{ENV_URL}/health", timeout=15)
-    health.raise_for_status()
-
     task_name = "all_tasks"
     benchmark = "attention-economy-simulator"
     log_start(task=task_name, env=benchmark, model=MODEL)
 
-    scores = {}
+    scores = {"easy": 0.0, "medium": 0.0, "hard": 0.0}
     all_step_rewards: list[float] = []
     total_steps = 0
-    for task_id in ["easy", "medium", "hard"]:
-        score, steps_taken, rewards = _run_task(task_id=task_id, seed=42, step_offset=total_steps)
-        scores[task_id] = score
-        total_steps += steps_taken
-        all_step_rewards.extend(rewards)
+    task_errors: list[str] = []
 
-    overall = round(sum(scores.values()) / 3.0, 4)
-    scores["overall"] = overall
+    try:
+        try:
+            _request_with_retry("GET", "/health", timeout=15, max_attempts=3)
+        except Exception as exc:
+            print(f"[DEBUG] Health check failed, continuing run: {exc}", flush=True)
 
-    with open("baseline_scores.json", "w", encoding="utf-8") as f:
-        json.dump(scores, f, indent=2)
+        for task_id in ["easy", "medium", "hard"]:
+            try:
+                score, steps_taken, rewards = _run_task(task_id=task_id, seed=42, step_offset=total_steps)
+                scores[task_id] = score
+                total_steps += steps_taken
+                all_step_rewards.extend(rewards)
+            except Exception as exc:
+                task_errors.append(f"{task_id}: {exc}")
+                print(f"[DEBUG] Task {task_id} failed: {exc}", flush=True)
+    finally:
+        overall = round((scores["easy"] + scores["medium"] + scores["hard"]) / 3.0, 4)
+        scores["overall"] = overall
 
-    # Success threshold for summary logging only.
-    success = overall >= 0.2
-    log_end(success=success, steps=total_steps, score=overall, rewards=all_step_rewards)
+        try:
+            with open("baseline_scores.json", "w", encoding="utf-8") as f:
+                json.dump(scores, f, indent=2)
+        except Exception as exc:
+            print(f"[DEBUG] Failed to write baseline_scores.json: {exc}", flush=True)
+
+        if task_errors:
+            print(f"[DEBUG] Partial run errors: {' | '.join(task_errors)}", flush=True)
+
+        # Success threshold for summary logging only.
+        success = overall >= 0.2 and not task_errors
+        log_end(success=success, steps=total_steps, score=overall, rewards=all_step_rewards)
 
 
 if __name__ == "__main__":
