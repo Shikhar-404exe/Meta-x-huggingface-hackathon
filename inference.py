@@ -25,11 +25,16 @@ client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
 MODEL = MODEL_NAME
 
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+EPSILON = 1e-4
 
 
 def _emit(tag: str, payload: Dict[str, Any]) -> None:
     # Structured stdout logs for evaluator parsing.
     print(f"[{tag}] {json.dumps(payload, separators=(',', ':'), ensure_ascii=True)}")
+
+
+def _strict_score(value: float) -> float:
+    return max(EPSILON, min(1.0 - EPSILON, value))
 
 
 def log_start(task: str, env: str, model: str) -> None:
@@ -254,7 +259,7 @@ def _run_task(task_id: str, seed: int = 42, step_offset: int = 0) -> tuple[float
     else:
         score = 0.30 * metrics["engagement"] + 0.25 * metrics["productivity"] + 0.45 * metrics["wellbeing"] - (0.12 * unsafe + 0.05 * loops)
 
-    return round(max(0.0, min(1.0, score)), 4), safety_guard, rewards
+    return round(_strict_score(score), 4), safety_guard, rewards
 
 
 def main() -> None:
@@ -283,7 +288,7 @@ def main() -> None:
                 task_errors.append(f"{task_id}: {exc}")
                 print(f"[DEBUG] Task {task_id} failed: {exc}", flush=True)
     finally:
-        overall = round((scores["easy"] + scores["medium"] + scores["hard"]) / 3.0, 4)
+        overall = round(_strict_score((scores["easy"] + scores["medium"] + scores["hard"]) / 3.0), 4)
         scores["overall"] = overall
 
         try:

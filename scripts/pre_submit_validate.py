@@ -94,7 +94,7 @@ def check_graders() -> Dict[str, bool]:
 
     checks["graders_deterministic"] = run_a == run_b
     checks["grader_keys"] = set(run_a.keys()) == {"easy", "medium", "hard", "overall"}
-    checks["grader_score_bounds"] = all(0.0 <= v <= 1.0 for v in run_a.values())
+    checks["grader_score_bounds"] = all(0.0 < v < 1.0 for v in run_a.values())
 
     print("Baseline deterministic grader scores:")
     print(json.dumps(run_a, indent=2))

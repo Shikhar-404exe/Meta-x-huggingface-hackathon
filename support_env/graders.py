@@ -5,9 +5,12 @@ from typing import Any, Callable, Dict
 from .env import AttentionEconomyEnv
 from .models import FeedAction, Observation
 
+EPSILON = 1e-4
+
 
 def _clip(value: float) -> float:
-    return max(0.0, min(1.0, value))
+    # Phase-2 validation expects strict bounds, not inclusive 0/1.
+    return max(EPSILON, min(1.0 - EPSILON, value))
 
 
 def _diversity_from_state(state: Dict[str, Any]) -> float:
@@ -81,5 +84,5 @@ GRADERS = {
 
 def grade_all(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]], seed: int = 42) -> Dict[str, float]:
     scores = {task_id: grader(agent_fn, seed=seed) for task_id, grader in GRADERS.items()}
-    scores["overall"] = round(sum(scores.values()) / len(GRADERS), 4)
+    scores["overall"] = round(_clip(sum(scores.values()) / len(GRADERS)), 4)
     return scores

@@ -22,7 +22,7 @@ def test_graders_return_bounded_scores() -> None:
     for task_id, grader in GRADERS.items():
         score = grader(scripted_agent, seed=42)
         assert task_id in {"easy", "medium", "hard"}
-        assert 0.0 <= score <= 1.0
+        assert 0.0 < score < 1.0
 
 
 def test_grade_all_is_deterministic_for_fixed_seed() -> None:
@@ -34,4 +34,4 @@ def test_grade_all_is_deterministic_for_fixed_seed() -> None:
 def test_grade_all_structure() -> None:
     scores = grade_all(scripted_agent, seed=42)
     assert set(scores.keys()) == {"easy", "medium", "hard", "overall"}
-    assert 0.0 <= scores["overall"] <= 1.0
+    assert 0.0 < scores["overall"] < 1.0
