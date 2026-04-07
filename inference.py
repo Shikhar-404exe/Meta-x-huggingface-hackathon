@@ -267,7 +267,7 @@ def main() -> None:
     benchmark = "attention-economy-simulator"
     log_start(task=task_name, env=benchmark, model=MODEL)
 
-    scores = {"easy": 0.0, "medium": 0.0, "hard": 0.0}
+    scores = {"easy": EPSILON, "medium": EPSILON, "hard": EPSILON}
     all_step_rewards: list[float] = []
     total_steps = 0
     task_errors: list[str] = []
@@ -286,6 +286,7 @@ def main() -> None:
                 all_step_rewards.extend(rewards)
             except Exception as exc:
                 task_errors.append(f"{task_id}: {exc}")
+                scores[task_id] = round(_strict_score(scores.get(task_id, EPSILON)), 4)
                 print(f"[DEBUG] Task {task_id} failed: {exc}", flush=True)
     finally:
         overall = round(_strict_score((scores["easy"] + scores["medium"] + scores["hard"]) / 3.0), 4)

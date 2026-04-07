@@ -96,7 +96,7 @@ python scripts/pre_submit_validate.py
 | ------- | -----: |
 | easy    | 0.5131 |
 | medium  | 0.1654 |
-| hard    | 0.0000 |
+| hard    | 0.0001 |
 | overall | 0.2262 |
 
 The script writes these values to baseline_scores.json and logs structured events in START/STEP/END format.
