@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Callable, Dict
 
 from .env import AttentionEconomyEnv
 from .models import FeedAction, Observation
 
-EPSILON = 1e-4
+EPSILON = 1e-3
 
 
 def _clip(value: float) -> float:
@@ -80,6 +81,13 @@ GRADERS = {
     "medium": grade_task_medium,
     "hard": grade_task_hard,
 }
+
+# Compatibility aliases for validators that expect different exported names.
+TASK_GRADERS = GRADERS
+
+
+def get_graders() -> Mapping[str, Callable[[Callable[[Observation], FeedAction | Dict[str, Any]], int], float]]:
+    return GRADERS
 
 
 def grade_all(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]], seed: int = 42) -> Dict[str, float]:

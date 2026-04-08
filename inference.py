@@ -25,7 +25,7 @@ client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
 MODEL = MODEL_NAME
 
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
-EPSILON = 1e-4
+EPSILON = 1e-3
 
 
 def _emit(tag: str, payload: Dict[str, Any]) -> None:

@@ -46,7 +46,7 @@ For compatibility:
 - medium: Balanced Feed Curation
 - hard: Long-Horizon Wellbeing Recovery
 
-We keep grading deterministic, and every score is clamped to 0.0-1.0.
+We keep grading deterministic, and every task score is clamped strictly inside (0, 1).
 
 ## Quick start (Windows)
 
