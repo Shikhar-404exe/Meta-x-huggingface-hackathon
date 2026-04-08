@@ -25,7 +25,8 @@ client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
 MODEL = MODEL_NAME
 
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
-EPSILON = 1e-3
+MIN_SCORE = 0.01
+MAX_SCORE = 0.99
 
 
 def _emit(tag: str, payload: Dict[str, Any]) -> None:
@@ -34,7 +35,7 @@ def _emit(tag: str, payload: Dict[str, Any]) -> None:
 
 
 def _strict_score(value: float) -> float:
-    return max(EPSILON, min(1.0 - EPSILON, value))
+    return max(MIN_SCORE, min(MAX_SCORE, float(value)))
 
 
 def log_start(task: str, env: str, model: str) -> None:
@@ -273,7 +274,7 @@ def main() -> None:
     benchmark = "attention-economy-simulator"
     log_start(task=task_name, env=benchmark, model=MODEL)
 
-    scores = {"easy": EPSILON, "medium": EPSILON, "hard": EPSILON}
+    scores = {"easy": MIN_SCORE, "medium": MIN_SCORE, "hard": MIN_SCORE}
     all_step_rewards: list[float] = []
     total_steps = 0
     task_errors: list[str] = []
@@ -292,7 +293,7 @@ def main() -> None:
                 all_step_rewards.extend(rewards)
             except Exception as exc:
                 task_errors.append(f"{task_id}: {exc}")
-                scores[task_id] = round(_strict_score(scores.get(task_id, EPSILON)), 4)
+                scores[task_id] = round(_strict_score(scores.get(task_id, MIN_SCORE)), 4)
                 print(f"[DEBUG] Task {task_id} failed: {exc}", flush=True)
     finally:
         overall = round(_strict_score((scores["easy"] + scores["medium"] + scores["hard"]) / 3.0), 4)

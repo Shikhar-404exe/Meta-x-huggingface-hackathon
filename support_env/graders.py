@@ -12,11 +12,7 @@ MAX_SCORE = 0.99
 
 def safe_score(score: float) -> float:
     # Keep all grader outputs strictly inside (0, 1).
-    if score <= 0.0:
-        return MIN_SCORE
-    if score >= 1.0:
-        return MAX_SCORE
-    return float(score)
+    return max(MIN_SCORE, min(MAX_SCORE, float(score)))
 
 
 def _default_agent(obs: Observation) -> FeedAction | Dict[str, Any]:
