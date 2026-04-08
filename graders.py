@@ -11,11 +11,16 @@ from support_env.graders import (
 )
 from support_env.models import FeedAction, Observation
 
-EPSILON = 1e-3
+MIN_SCORE = 0.01
+MAX_SCORE = 0.99
 
 
-def _strict_score(value: float) -> float:
-    return max(EPSILON, min(1.0 - EPSILON, float(value)))
+def safe_score(score: float) -> float:
+    if score <= 0.0:
+        return MIN_SCORE
+    if score >= 1.0:
+        return MAX_SCORE
+    return float(score)
 
 
 def _default_agent(obs: Observation) -> FeedAction | Dict[str, Any]:
@@ -32,17 +37,17 @@ def _default_agent(obs: Observation) -> FeedAction | Dict[str, Any]:
 
 def grade_easy(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None, seed: int = 42) -> float:
     runner = agent_fn or _default_agent
-    return _strict_score(_grade_task_easy(runner, seed=seed))
+    return safe_score(_grade_task_easy(runner, seed=seed))
 
 
 def grade_medium(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None, seed: int = 42) -> float:
     runner = agent_fn or _default_agent
-    return _strict_score(_grade_task_medium(runner, seed=seed))
+    return safe_score(_grade_task_medium(runner, seed=seed))
 
 
 def grade_hard(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None, seed: int = 42) -> float:
     runner = agent_fn or _default_agent
-    return _strict_score(_grade_task_hard(runner, seed=seed))
+    return safe_score(_grade_task_hard(runner, seed=seed))
 
 
 # Aliases used by some validators.
@@ -67,10 +72,10 @@ def get_graders() -> Mapping[str, Callable[..., float]]:
 def grade_all(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None, seed: int = 42) -> Dict[str, float]:
     runner = agent_fn or _default_agent
     scores = {
-        task_id: _strict_score(grader(runner, seed=seed))
+        task_id: safe_score(grader(runner, seed=seed))
         for task_id, grader in GRADERS.items()
     }
-    scores["overall"] = _strict_score(sum(scores.values()) / len(GRADERS))
+    scores["overall"] = safe_score(sum(scores.values()) / len(GRADERS))
     return scores
 
 
