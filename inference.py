@@ -54,16 +54,22 @@ def log_step(step: int, action: str, reward: float, done: bool, error: str | Non
     )
 
 
-def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
-    _emit(
-        "END",
-        {
-            "success": bool(success),
-            "steps": int(steps),
-            "score": round(float(score), 4),
-            "rewards": [round(float(r), 4) for r in rewards],
-        },
-    )
+def log_end(
+    success: bool,
+    steps: int,
+    score: float,
+    rewards: list[float],
+    task_scores: Dict[str, float] | None = None,
+) -> None:
+    payload: Dict[str, Any] = {
+        "success": bool(success),
+        "steps": int(steps),
+        "score": round(float(score), 4),
+        "rewards": [round(float(r), 4) for r in rewards],
+    }
+    if task_scores:
+        payload["task_scores"] = {k: round(float(v), 4) for k, v in task_scores.items()}
+    _emit("END", payload)
 
 
 def _request_with_retry(
@@ -303,7 +309,7 @@ def main() -> None:
 
         # Success threshold for summary logging only.
         success = overall >= 0.2 and not task_errors
-        log_end(success=success, steps=total_steps, score=overall, rewards=all_step_rewards)
+        log_end(success=success, steps=total_steps, score=overall, rewards=all_step_rewards, task_scores=scores)
 
 
 if __name__ == "__main__":

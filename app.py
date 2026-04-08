@@ -166,6 +166,7 @@ def tasks() -> dict:
                 "description": task["description"],
                 "max_steps": task["max_steps"],
                 "time_budget": task["time_budget"],
+                "grader": task.get("grader"),
             }
         )
     return {"tasks": payload}

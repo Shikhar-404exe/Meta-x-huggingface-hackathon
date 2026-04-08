@@ -10,6 +10,7 @@ TASKS: Dict[str, Dict[str, Any]] = {
         "difficulty": "easy",
         "description": "Maintain engagement while preventing addiction spikes for a casual user session.",
         "max_steps": 14,
+        "grader": "graders:grade_easy",
         "time_budget": 45,
         "initial_user": {
             "mood": "bored",
@@ -37,6 +38,7 @@ TASKS: Dict[str, Dict[str, Any]] = {
         "difficulty": "medium",
         "description": "Balance engagement and productivity while preserving content diversity in a mixed feed.",
         "max_steps": 18,
+        "grader": "graders:grade_medium",
         "time_budget": 55,
         "initial_user": {
             "mood": "focused",
@@ -65,6 +67,7 @@ TASKS: Dict[str, Dict[str, Any]] = {
         "difficulty": "hard",
         "description": "Recover wellbeing from a high-risk, high-toxicity session while keeping engagement and productivity functional.",
         "max_steps": 24,
+        "grader": "graders:grade_hard",
         "time_budget": 65,
         "initial_user": {
             "mood": "overstimulated",

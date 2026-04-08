@@ -18,16 +18,31 @@ def _strict_score(value: float) -> float:
     return max(EPSILON, min(1.0 - EPSILON, float(value)))
 
 
-def grade_easy(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]], seed: int = 42) -> float:
-    return _strict_score(_grade_task_easy(agent_fn, seed=seed))
+def _default_agent(obs: Observation) -> FeedAction | Dict[str, Any]:
+    if obs.fatigue > 0.75:
+        return FeedAction(action_type="suggest_break", break_minutes=7)
+
+    if obs.addiction_level > 0.70:
+        return FeedAction(action_type="reorder_feed", strategy="prioritize_wellbeing")
+
+    safe_items = [x for x in obs.feed_items if x.category != "toxic"]
+    target = safe_items[0] if safe_items else obs.feed_items[0]
+    return FeedAction(action_type="recommend_item", item_id=target.id, rationale="default grader policy")
 
 
-def grade_medium(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]], seed: int = 42) -> float:
-    return _strict_score(_grade_task_medium(agent_fn, seed=seed))
+def grade_easy(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None, seed: int = 42) -> float:
+    runner = agent_fn or _default_agent
+    return _strict_score(_grade_task_easy(runner, seed=seed))
 
 
-def grade_hard(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]], seed: int = 42) -> float:
-    return _strict_score(_grade_task_hard(agent_fn, seed=seed))
+def grade_medium(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None, seed: int = 42) -> float:
+    runner = agent_fn or _default_agent
+    return _strict_score(_grade_task_medium(runner, seed=seed))
+
+
+def grade_hard(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None, seed: int = 42) -> float:
+    runner = agent_fn or _default_agent
+    return _strict_score(_grade_task_hard(runner, seed=seed))
 
 
 # Aliases used by some validators.
@@ -45,13 +60,14 @@ GRADERS = {
 TASK_GRADERS = GRADERS
 
 
-def get_graders() -> Mapping[str, Callable[[Callable[[Observation], FeedAction | Dict[str, Any]], int], float]]:
+def get_graders() -> Mapping[str, Callable[..., float]]:
     return GRADERS
 
 
-def grade_all(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]], seed: int = 42) -> Dict[str, float]:
+def grade_all(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None, seed: int = 42) -> Dict[str, float]:
+    runner = agent_fn or _default_agent
     scores = {
-        task_id: _strict_score(grader(agent_fn, seed=seed))
+        task_id: _strict_score(grader(runner, seed=seed))
         for task_id, grader in GRADERS.items()
     }
     scores["overall"] = _strict_score(sum(scores.values()) / len(GRADERS))
