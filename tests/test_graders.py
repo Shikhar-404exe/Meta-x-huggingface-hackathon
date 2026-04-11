@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Dict
 
+import graders as root_graders
 from support_env.graders import GRADERS, grade_all
 from support_env.models import FeedAction, Observation
 
@@ -35,3 +36,16 @@ def test_grade_all_structure() -> None:
     scores = grade_all(scripted_agent, seed=42)
     assert set(scores.keys()) == {"easy", "medium", "hard", "overall"}
     assert 0.0 < scores["overall"] < 1.0
+
+
+def test_graders_accept_agent_alias_kwargs() -> None:
+    # Some external validator harnesses call graders with agent/runner aliases.
+    assert 0.0 < root_graders.grade_easy(agent=scripted_agent, random_seed=42) < 1.0
+    assert 0.0 < root_graders.grade_medium(runner=scripted_agent, rng_seed=42) < 1.0
+    assert 0.0 < root_graders.grade_hard(policy_fn=scripted_agent, episode_seed=42) < 1.0
+
+
+def test_grade_all_accepts_agent_alias_kwargs() -> None:
+    scores = root_graders.grade_all(agent=scripted_agent, random_seed=42)
+    assert set(scores.keys()) == {"easy", "medium", "hard", "overall"}
+    assert all(0.0 < v < 1.0 for v in scores.values())

@@ -49,6 +49,29 @@ def _resolve_runner_and_seed(
     return runner, resolved_seed_int
 
 
+def _resolve_compat_kwargs(
+    agent_fn: object | None,
+    seed: Any,
+    kwargs: Dict[str, Any] | None = None,
+) -> tuple[object | None, Any]:
+    extra = dict(kwargs or {})
+
+    if agent_fn is None:
+        for key in ("agent", "runner", "policy", "policy_fn", "inference_fn", "fn"):
+            candidate = extra.pop(key, None)
+            if callable(candidate):
+                agent_fn = candidate
+                break
+
+    for key in ("random_seed", "rng_seed", "episode_seed"):
+        if key in extra:
+            seed = extra.pop(key)
+            break
+
+    # Intentionally ignore any remaining unknown kwargs for validator compatibility.
+    return agent_fn, seed
+
+
 def _diversity_from_state(state: Dict[str, Any]) -> float:
     categories = [h.get("category") for h in state["history"] if h.get("category")]
     if not categories:
@@ -91,7 +114,9 @@ def run_agent_on_task(
 def grade_task_easy(
     agent_fn: object | None = None,
     seed: Any = 42,
+    **kwargs: Any,
 ) -> float:
+    agent_fn, seed = _resolve_compat_kwargs(agent_fn, seed, kwargs)
     result = run_agent_on_task(agent_fn, "easy", seed=seed)
     m = result["metrics"]
     penalties = 0.08 * result["unsafe_events"] + 0.04 * result["loop_penalties"]
@@ -102,7 +127,9 @@ def grade_task_easy(
 def grade_task_medium(
     agent_fn: object | None = None,
     seed: Any = 42,
+    **kwargs: Any,
 ) -> float:
+    agent_fn, seed = _resolve_compat_kwargs(agent_fn, seed, kwargs)
     result = run_agent_on_task(agent_fn, "medium", seed=seed)
     m = result["metrics"]
     penalties = 0.08 * result["unsafe_events"] + 0.05 * result["loop_penalties"]
@@ -113,7 +140,9 @@ def grade_task_medium(
 def grade_task_hard(
     agent_fn: object | None = None,
     seed: Any = 42,
+    **kwargs: Any,
 ) -> float:
+    agent_fn, seed = _resolve_compat_kwargs(agent_fn, seed, kwargs)
     result = run_agent_on_task(agent_fn, "hard", seed=seed)
     m = result["metrics"]
     penalties = 0.12 * result["unsafe_events"] + 0.05 * result["loop_penalties"]
@@ -144,7 +173,9 @@ def get_graders() -> Mapping[str, Callable[..., float]]:
 def grade_all(
     agent_fn: object | None = None,
     seed: Any = 42,
+    **kwargs: Any,
 ) -> Dict[str, float]:
+    agent_fn, seed = _resolve_compat_kwargs(agent_fn, seed, kwargs)
     scores = {task_id: grader(agent_fn, seed=seed) for task_id, grader in GRADERS.items()}
     scores["overall"] = round(safe_score(sum(scores.values()) / len(GRADERS)), 4)
     return scores

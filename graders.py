@@ -54,18 +54,56 @@ def _resolve_runner_and_seed(
     return runner, resolved_seed_int
 
 
-def grade_easy(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None, seed: int = 42) -> float:
-    runner, resolved_seed = _resolve_runner_and_seed(agent_fn, seed)
+def _resolve_compat_kwargs(
+    agent_fn: object | None,
+    seed: Any,
+    kwargs: Dict[str, Any] | None = None,
+) -> tuple[object | None, Any]:
+    extra = dict(kwargs or {})
+
+    if agent_fn is None:
+        for key in ("agent", "runner", "policy", "policy_fn", "inference_fn", "fn"):
+            candidate = extra.pop(key, None)
+            if callable(candidate):
+                agent_fn = candidate
+                break
+
+    for key in ("random_seed", "rng_seed", "episode_seed"):
+        if key in extra:
+            seed = extra.pop(key)
+            break
+
+    # Intentionally ignore any remaining unknown kwargs for validator compatibility.
+    return agent_fn, seed
+
+
+def grade_easy(
+    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None,
+    seed: int = 42,
+    **kwargs: Any,
+) -> float:
+    resolved_agent, resolved_seed_input = _resolve_compat_kwargs(agent_fn, seed, kwargs)
+    runner, resolved_seed = _resolve_runner_and_seed(resolved_agent, resolved_seed_input)
     return safe_score(_grade_task_easy(runner, seed=resolved_seed))
 
 
-def grade_medium(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None, seed: int = 42) -> float:
-    runner, resolved_seed = _resolve_runner_and_seed(agent_fn, seed)
+def grade_medium(
+    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None,
+    seed: int = 42,
+    **kwargs: Any,
+) -> float:
+    resolved_agent, resolved_seed_input = _resolve_compat_kwargs(agent_fn, seed, kwargs)
+    runner, resolved_seed = _resolve_runner_and_seed(resolved_agent, resolved_seed_input)
     return safe_score(_grade_task_medium(runner, seed=resolved_seed))
 
 
-def grade_hard(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None, seed: int = 42) -> float:
-    runner, resolved_seed = _resolve_runner_and_seed(agent_fn, seed)
+def grade_hard(
+    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None,
+    seed: int = 42,
+    **kwargs: Any,
+) -> float:
+    resolved_agent, resolved_seed_input = _resolve_compat_kwargs(agent_fn, seed, kwargs)
+    runner, resolved_seed = _resolve_runner_and_seed(resolved_agent, resolved_seed_input)
     return safe_score(_grade_task_hard(runner, seed=resolved_seed))
 
 
@@ -88,8 +126,13 @@ def get_graders() -> Mapping[str, Callable[..., float]]:
     return GRADERS
 
 
-def grade_all(agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None, seed: int = 42) -> Dict[str, float]:
-    runner, resolved_seed = _resolve_runner_and_seed(agent_fn, seed)
+def grade_all(
+    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None,
+    seed: int = 42,
+    **kwargs: Any,
+) -> Dict[str, float]:
+    resolved_agent, resolved_seed_input = _resolve_compat_kwargs(agent_fn, seed, kwargs)
+    runner, resolved_seed = _resolve_runner_and_seed(resolved_agent, resolved_seed_input)
     scores = {
         task_id: safe_score(grader(runner, seed=resolved_seed))
         for task_id, grader in GRADERS.items()
