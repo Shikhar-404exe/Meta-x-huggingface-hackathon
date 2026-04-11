@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, cast
 
 from .env import AttentionEconomyEnv
 from .models import FeedAction, Observation
 
 MIN_SCORE = 0.01
 MAX_SCORE = 0.99
+AgentFn = Callable[[Observation], FeedAction | Dict[str, Any]]
 
 
 def safe_score(score: float) -> float:
@@ -28,9 +29,9 @@ def _default_agent(obs: Observation) -> FeedAction | Dict[str, Any]:
 
 
 def _resolve_runner_and_seed(
-    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | Any = None,
+    agent_fn: object | None = None,
     seed: Any = 42,
-) -> tuple[Callable[[Observation], FeedAction | Dict[str, Any]], int]:
+) -> tuple[AgentFn, int]:
     # Accept grade_x(seed) style invocations from external validator harnesses.
     resolved_agent = agent_fn
     resolved_seed = seed
@@ -40,11 +41,11 @@ def _resolve_runner_and_seed(
         resolved_agent = None
 
     try:
-        resolved_seed_int = int(resolved_seed)
+        resolved_seed_int = int(str(resolved_seed))
     except Exception:
         resolved_seed_int = 42
 
-    runner = resolved_agent if callable(resolved_agent) else _default_agent
+    runner: AgentFn = cast(AgentFn, resolved_agent) if callable(resolved_agent) else _default_agent
     return runner, resolved_seed_int
 
 
@@ -56,7 +57,7 @@ def _diversity_from_state(state: Dict[str, Any]) -> float:
 
 
 def run_agent_on_task(
-    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | Any,
+    agent_fn: object | None,
     task_id: str,
     seed: Any = 42,
 ) -> Dict[str, Any]:
@@ -88,7 +89,7 @@ def run_agent_on_task(
 
 
 def grade_task_easy(
-    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | Any = None,
+    agent_fn: object | None = None,
     seed: Any = 42,
 ) -> float:
     result = run_agent_on_task(agent_fn, "easy", seed=seed)
@@ -99,7 +100,7 @@ def grade_task_easy(
 
 
 def grade_task_medium(
-    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | Any = None,
+    agent_fn: object | None = None,
     seed: Any = 42,
 ) -> float:
     result = run_agent_on_task(agent_fn, "medium", seed=seed)
@@ -110,7 +111,7 @@ def grade_task_medium(
 
 
 def grade_task_hard(
-    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | Any = None,
+    agent_fn: object | None = None,
     seed: Any = 42,
 ) -> float:
     result = run_agent_on_task(agent_fn, "hard", seed=seed)
@@ -141,7 +142,7 @@ def get_graders() -> Mapping[str, Callable[..., float]]:
 
 
 def grade_all(
-    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | Any = None,
+    agent_fn: object | None = None,
     seed: Any = 42,
 ) -> Dict[str, float]:
     scores = {task_id: grader(agent_fn, seed=seed) for task_id, grader in GRADERS.items()}
