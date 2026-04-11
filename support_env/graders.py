@@ -27,6 +27,27 @@ def _default_agent(obs: Observation) -> FeedAction | Dict[str, Any]:
     return FeedAction(action_type="recommend_item", item_id=target.id, rationale="default grader policy")
 
 
+def _resolve_runner_and_seed(
+    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | Any = None,
+    seed: Any = 42,
+) -> tuple[Callable[[Observation], FeedAction | Dict[str, Any]], int]:
+    # Accept grade_x(seed) style invocations from external validator harnesses.
+    resolved_agent = agent_fn
+    resolved_seed = seed
+
+    if resolved_agent is not None and not callable(resolved_agent):
+        resolved_seed = resolved_agent
+        resolved_agent = None
+
+    try:
+        resolved_seed_int = int(resolved_seed)
+    except Exception:
+        resolved_seed_int = 42
+
+    runner = resolved_agent if callable(resolved_agent) else _default_agent
+    return runner, resolved_seed_int
+
+
 def _diversity_from_state(state: Dict[str, Any]) -> float:
     categories = [h.get("category") for h in state["history"] if h.get("category")]
     if not categories:
@@ -35,13 +56,13 @@ def _diversity_from_state(state: Dict[str, Any]) -> float:
 
 
 def run_agent_on_task(
-    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None,
+    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | Any,
     task_id: str,
-    seed: int = 42,
+    seed: Any = 42,
 ) -> Dict[str, Any]:
-    runner = agent_fn or _default_agent
-    env = AttentionEconomyEnv(task_id=task_id, seed=seed)
-    obs = env.reset(task_id=task_id, seed=seed)
+    runner, resolved_seed = _resolve_runner_and_seed(agent_fn, seed)
+    env = AttentionEconomyEnv(task_id=task_id, seed=resolved_seed)
+    obs = env.reset(task_id=task_id, seed=resolved_seed)
 
     while True:
         action = runner(obs)
@@ -67,8 +88,8 @@ def run_agent_on_task(
 
 
 def grade_task_easy(
-    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None,
-    seed: int = 42,
+    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | Any = None,
+    seed: Any = 42,
 ) -> float:
     result = run_agent_on_task(agent_fn, "easy", seed=seed)
     m = result["metrics"]
@@ -78,8 +99,8 @@ def grade_task_easy(
 
 
 def grade_task_medium(
-    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None,
-    seed: int = 42,
+    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | Any = None,
+    seed: Any = 42,
 ) -> float:
     result = run_agent_on_task(agent_fn, "medium", seed=seed)
     m = result["metrics"]
@@ -89,8 +110,8 @@ def grade_task_medium(
 
 
 def grade_task_hard(
-    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None,
-    seed: int = 42,
+    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | Any = None,
+    seed: Any = 42,
 ) -> float:
     result = run_agent_on_task(agent_fn, "hard", seed=seed)
     m = result["metrics"]
@@ -120,8 +141,8 @@ def get_graders() -> Mapping[str, Callable[..., float]]:
 
 
 def grade_all(
-    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None,
-    seed: int = 42,
+    agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | Any = None,
+    seed: Any = 42,
 ) -> Dict[str, float]:
     scores = {task_id: grader(agent_fn, seed=seed) for task_id, grader in GRADERS.items()}
     scores["overall"] = round(safe_score(sum(scores.values()) / len(GRADERS)), 4)
