@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Dict
 
 import graders as root_graders
+import server.graders as server_graders
 from support_env.graders import GRADERS, grade_all
 from support_env.models import FeedAction, Observation
 
@@ -47,5 +48,26 @@ def test_graders_accept_agent_alias_kwargs() -> None:
 
 def test_grade_all_accepts_agent_alias_kwargs() -> None:
     scores = root_graders.grade_all(agent=scripted_agent, random_seed=42)
+    assert set(scores.keys()) == {"easy", "medium", "hard", "overall"}
+    assert all(0.0 < v < 1.0 for v in scores.values())
+
+
+def test_graders_accept_extra_positional_call_styles() -> None:
+    assert 0.0 < root_graders.grade_easy(scripted_agent, 42, "ignored") < 1.0
+    assert 0.0 < root_graders.grade_medium(42, scripted_agent, "ignored") < 1.0
+    assert 0.0 < root_graders.grade_hard("not-a-seed") < 1.0
+
+
+def test_server_class_based_graders_are_bounded() -> None:
+    scores = [
+        server_graders.EasyGrader().grade(seed=42),
+        server_graders.MediumGrader().grade(agent=scripted_agent, random_seed=42),
+        server_graders.HardGrader().grade(scripted_agent, 42, "extra"),
+    ]
+    assert all(0.0 < score < 1.0 for score in scores)
+
+
+def test_server_grade_all_structure() -> None:
+    scores = server_graders.grade_all(seed=42)
     assert set(scores.keys()) == {"easy", "medium", "hard", "overall"}
     assert all(0.0 < v < 1.0 for v in scores.values())

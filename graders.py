@@ -77,32 +77,55 @@ def _resolve_compat_kwargs(
     return agent_fn, seed
 
 
+def _resolve_compat_call(
+    args: tuple[Any, ...],
+    *,
+    agent_fn: object | None = None,
+    seed: Any = 42,
+    kwargs: Dict[str, Any] | None = None,
+) -> tuple[object | None, Any]:
+    resolved_agent = agent_fn
+    resolved_seed = seed
+
+    for arg in args:
+        if callable(arg) and resolved_agent is None:
+            resolved_agent = arg
+            continue
+        if not callable(arg):
+            resolved_seed = arg
+
+    return _resolve_compat_kwargs(resolved_agent, resolved_seed, kwargs)
+
+
 def grade_easy(
+    *args: Any,
     agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None,
     seed: int = 42,
     **kwargs: Any,
 ) -> float:
-    resolved_agent, resolved_seed_input = _resolve_compat_kwargs(agent_fn, seed, kwargs)
+    resolved_agent, resolved_seed_input = _resolve_compat_call(args, agent_fn=agent_fn, seed=seed, kwargs=kwargs)
     runner, resolved_seed = _resolve_runner_and_seed(resolved_agent, resolved_seed_input)
     return safe_score(_grade_task_easy(runner, seed=resolved_seed))
 
 
 def grade_medium(
+    *args: Any,
     agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None,
     seed: int = 42,
     **kwargs: Any,
 ) -> float:
-    resolved_agent, resolved_seed_input = _resolve_compat_kwargs(agent_fn, seed, kwargs)
+    resolved_agent, resolved_seed_input = _resolve_compat_call(args, agent_fn=agent_fn, seed=seed, kwargs=kwargs)
     runner, resolved_seed = _resolve_runner_and_seed(resolved_agent, resolved_seed_input)
     return safe_score(_grade_task_medium(runner, seed=resolved_seed))
 
 
 def grade_hard(
+    *args: Any,
     agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None,
     seed: int = 42,
     **kwargs: Any,
 ) -> float:
-    resolved_agent, resolved_seed_input = _resolve_compat_kwargs(agent_fn, seed, kwargs)
+    resolved_agent, resolved_seed_input = _resolve_compat_call(args, agent_fn=agent_fn, seed=seed, kwargs=kwargs)
     runner, resolved_seed = _resolve_runner_and_seed(resolved_agent, resolved_seed_input)
     return safe_score(_grade_task_hard(runner, seed=resolved_seed))
 
@@ -127,11 +150,12 @@ def get_graders() -> Mapping[str, Callable[..., float]]:
 
 
 def grade_all(
+    *args: Any,
     agent_fn: Callable[[Observation], FeedAction | Dict[str, Any]] | None = None,
     seed: int = 42,
     **kwargs: Any,
 ) -> Dict[str, float]:
-    resolved_agent, resolved_seed_input = _resolve_compat_kwargs(agent_fn, seed, kwargs)
+    resolved_agent, resolved_seed_input = _resolve_compat_call(args, agent_fn=agent_fn, seed=seed, kwargs=kwargs)
     runner, resolved_seed = _resolve_runner_and_seed(resolved_agent, resolved_seed_input)
     scores = {
         task_id: safe_score(grader(runner, seed=resolved_seed))
