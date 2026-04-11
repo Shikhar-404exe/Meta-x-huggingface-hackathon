@@ -27,6 +27,11 @@ MODEL = MODEL_NAME
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 MIN_SCORE = 0.1
 MAX_SCORE = 0.9
+TASK_GRADER_PATHS = {
+    "easy": "graders.grade_easy",
+    "medium": "graders.grade_medium",
+    "hard": "graders.grade_hard",
+}
 
 
 def _emit(tag: str, payload: Dict[str, Any]) -> None:
@@ -38,8 +43,11 @@ def _strict_score(value: float) -> float:
     return max(MIN_SCORE, min(MAX_SCORE, float(value)))
 
 
-def log_start(task: str, env: str, model: str) -> None:
-    _emit("START", {"task": task, "env": env, "model": model})
+def log_start(task: str, env: str, model: str, grader: str | None = None) -> None:
+    payload: Dict[str, Any] = {"task": task, "env": env, "model": model}
+    if grader:
+        payload["grader"] = grader
+    _emit("START", payload)
 
 
 def log_step(step: int, action: str, reward: float, done: bool, error: str | None) -> None:
@@ -62,6 +70,9 @@ def log_end(
     rewards: list[float],
     task_scores: Dict[str, float] | None = None,
     task: str | None = None,
+    grader: str | None = None,
+    error: str | None = None,
+    tasks: list[Dict[str, Any]] | None = None,
 ) -> None:
     payload: Dict[str, Any] = {
         "success": bool(success),
@@ -71,6 +82,12 @@ def log_end(
     }
     if task:
         payload["task"] = task
+    if grader:
+        payload["grader"] = grader
+    if error:
+        payload["error"] = error
+    if tasks:
+        payload["tasks"] = tasks
     if task_scores:
         payload["task_scores"] = {k: round(float(v), 4) for k, v in task_scores.items()}
         # Flatten common score keys for simpler validator extraction.
@@ -277,12 +294,9 @@ def _run_task(task_id: str, seed: int = 42, step_offset: int = 0) -> tuple[float
 
 
 def main() -> None:
-    task_name = "all_tasks"
     benchmark = "attention-economy-simulator"
-    log_start(task=task_name, env=benchmark, model=MODEL)
 
     scores = {"easy": MIN_SCORE, "medium": MIN_SCORE, "hard": MIN_SCORE}
-    all_step_rewards: list[float] = []
     total_steps = 0
     task_errors: list[str] = []
 
@@ -293,15 +307,36 @@ def main() -> None:
             print(f"[DEBUG] Health check failed, continuing run: {exc}", flush=True)
 
         for task_id in ["easy", "medium", "hard"]:
+            grader_path = TASK_GRADER_PATHS[task_id]
+            log_start(task=task_id, env=benchmark, model=MODEL, grader=grader_path)
             try:
-                score, steps_taken, rewards = _run_task(task_id=task_id, seed=42, step_offset=total_steps)
+                score, steps_taken, rewards = _run_task(task_id=task_id, seed=42, step_offset=0)
                 scores[task_id] = score
                 total_steps += steps_taken
-                all_step_rewards.extend(rewards)
+                log_end(
+                    success=True,
+                    steps=steps_taken,
+                    score=score,
+                    rewards=rewards,
+                    task_scores={task_id: score},
+                    task=task_id,
+                    grader=grader_path,
+                )
             except Exception as exc:
                 task_errors.append(f"{task_id}: {exc}")
-                scores[task_id] = round(_strict_score(scores.get(task_id, MIN_SCORE)), 4)
+                fallback_score = round(_strict_score(scores.get(task_id, MIN_SCORE)), 4)
+                scores[task_id] = fallback_score
                 print(f"[DEBUG] Task {task_id} failed: {exc}", flush=True)
+                log_end(
+                    success=False,
+                    steps=0,
+                    score=fallback_score,
+                    rewards=[],
+                    task_scores={task_id: fallback_score},
+                    task=task_id,
+                    grader=grader_path,
+                    error=str(exc),
+                )
     finally:
         overall = round(_strict_score((scores["easy"] + scores["medium"] + scores["hard"]) / 3.0), 4)
         scores["overall"] = overall
@@ -315,9 +350,26 @@ def main() -> None:
         if task_errors:
             print(f"[DEBUG] Partial run errors: {' | '.join(task_errors)}", flush=True)
 
-        # Success threshold for summary logging only.
-        success = overall >= 0.2 and not task_errors
-        log_end(success=success, steps=total_steps, score=overall, rewards=all_step_rewards, task_scores=scores, task=task_name)
+        tasks_payload = [
+            {
+                "id": task_id,
+                "grader": TASK_GRADER_PATHS[task_id],
+                "score": round(float(scores[task_id]), 4),
+            }
+            for task_id in ("easy", "medium", "hard")
+        ]
+        summary_success = overall >= 0.2 and not task_errors
+        log_end(
+            success=summary_success,
+            steps=total_steps,
+            score=overall,
+            rewards=[],
+            task_scores=scores,
+            task="all_tasks",
+            tasks=tasks_payload,
+        )
+
+        print(f"[SUMMARY] {json.dumps(scores, separators=(',', ':'), ensure_ascii=True)}")
 
 
 if __name__ == "__main__":
