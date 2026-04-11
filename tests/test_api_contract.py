@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from app import app
+from tasks import TASK_IDS, TASKS, TASKS_LIST
 
 
 client = TestClient(app)
@@ -21,6 +22,17 @@ def test_tasks_endpoint() -> None:
     data = resp.json()
     assert "tasks" in data
     assert len(data["tasks"]) >= 3
+    for task in data["tasks"]:
+        assert task.get("id")
+        assert task.get("grader")
+        assert task.get("python_module")
+
+
+def test_root_task_registry_aliases() -> None:
+    assert len(TASKS) >= 3
+    assert len(TASKS_LIST) >= 3
+    assert len(TASK_IDS) >= 3
+    assert set(TASK_IDS) == set(TASKS.keys())
 
 
 def test_reset_step_state_contract() -> None:

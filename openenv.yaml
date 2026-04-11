@@ -87,24 +87,38 @@ tasks:
     difficulty: easy
     max_steps: 14
     grader: graders.grade_easy
+    python_module: support_env.tasks
+    task_key: easy
+    grader_module: graders
     description: Maintain engagement while keeping addiction low.
   - id: medium
     name: Balanced Feed Curation
     difficulty: medium
     max_steps: 18
     grader: graders.grade_medium
+    python_module: support_env.tasks
+    task_key: medium
+    grader_module: graders
     description: Balance engagement and productivity with diversity.
   - id: hard
     name: Long-Horizon Wellbeing Recovery
     difficulty: hard
     max_steps: 24
     grader: graders.grade_hard
+    python_module: support_env.tasks
+    task_key: hard
+    grader_module: graders
     description: Recover wellbeing under high addiction and fatigue pressure.
 
 graders:
   easy: graders.grade_easy
   medium: graders.grade_medium
   hard: graders.grade_hard
+
+task_registry:
+  python_module: support_env.tasks
+  dict_symbol: TASKS
+  list_symbol: TASKS_LIST
 
 runtime:
   framework: fastapi

@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+TASKS_MODULE = "support_env.tasks"
+GRADERS_MODULE = "graders"
+
 # Deterministic task definitions with fixed parameters and feed pools.
 TASKS: Dict[str, Dict[str, Any]] = {
     "easy": {
@@ -11,6 +14,9 @@ TASKS: Dict[str, Dict[str, Any]] = {
         "description": "Maintain engagement while preventing addiction spikes for a casual user session.",
         "max_steps": 14,
         "grader": "graders.grade_easy",
+        "python_module": TASKS_MODULE,
+        "task_key": "easy",
+        "grader_module": GRADERS_MODULE,
         "time_budget": 45,
         "initial_user": {
             "mood": "bored",
@@ -39,6 +45,9 @@ TASKS: Dict[str, Dict[str, Any]] = {
         "description": "Balance engagement and productivity while preserving content diversity in a mixed feed.",
         "max_steps": 18,
         "grader": "graders.grade_medium",
+        "python_module": TASKS_MODULE,
+        "task_key": "medium",
+        "grader_module": GRADERS_MODULE,
         "time_budget": 55,
         "initial_user": {
             "mood": "focused",
@@ -68,6 +77,9 @@ TASKS: Dict[str, Dict[str, Any]] = {
         "description": "Recover wellbeing from a high-risk, high-toxicity session while keeping engagement and productivity functional.",
         "max_steps": 24,
         "grader": "graders.grade_hard",
+        "python_module": TASKS_MODULE,
+        "task_key": "hard",
+        "grader_module": GRADERS_MODULE,
         "time_budget": 65,
         "initial_user": {
             "mood": "overstimulated",
@@ -92,3 +104,7 @@ TASKS: Dict[str, Dict[str, Any]] = {
         ],
     },
 }
+
+# Alternate registry exports used by some validator harnesses.
+TASKS_LIST = list(TASKS.values())
+TASK_IDS = tuple(TASKS.keys())
