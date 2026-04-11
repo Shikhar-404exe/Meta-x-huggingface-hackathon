@@ -11,8 +11,8 @@ from support_env.graders import (
 )
 from support_env.models import FeedAction, Observation
 
-MIN_SCORE = 0.01
-MAX_SCORE = 0.99
+MIN_SCORE = 0.1
+MAX_SCORE = 0.9
 AgentFn = Callable[[Observation], FeedAction | Dict[str, Any]]
 
 

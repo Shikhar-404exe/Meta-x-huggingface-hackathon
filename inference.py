@@ -25,8 +25,8 @@ client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
 MODEL = MODEL_NAME
 
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
-MIN_SCORE = 0.01
-MAX_SCORE = 0.99
+MIN_SCORE = 0.1
+MAX_SCORE = 0.9
 
 
 def _emit(tag: str, payload: Dict[str, Any]) -> None:
@@ -293,31 +293,15 @@ def main() -> None:
             print(f"[DEBUG] Health check failed, continuing run: {exc}", flush=True)
 
         for task_id in ["easy", "medium", "hard"]:
-            log_start(task=task_id, env=benchmark, model=MODEL)
-            task_success = True
-            task_steps = 0
-            task_rewards: list[float] = []
             try:
                 score, steps_taken, rewards = _run_task(task_id=task_id, seed=42, step_offset=total_steps)
                 scores[task_id] = score
                 total_steps += steps_taken
                 all_step_rewards.extend(rewards)
-                task_steps = steps_taken
-                task_rewards = rewards
             except Exception as exc:
-                task_success = False
                 task_errors.append(f"{task_id}: {exc}")
                 scores[task_id] = round(_strict_score(scores.get(task_id, MIN_SCORE)), 4)
                 print(f"[DEBUG] Task {task_id} failed: {exc}", flush=True)
-            finally:
-                log_end(
-                    success=task_success,
-                    steps=task_steps,
-                    score=scores[task_id],
-                    rewards=task_rewards,
-                    task_scores={task_id: scores[task_id]},
-                    task=task_id,
-                )
     finally:
         overall = round(_strict_score((scores["easy"] + scores["medium"] + scores["hard"]) / 3.0), 4)
         scores["overall"] = overall
