@@ -7,13 +7,18 @@ from .env import AttentionEconomyEnv
 from .models import FeedAction, Observation
 
 MIN_SCORE = 0.1
-MAX_SCORE = 0.9
+MAX_SCORE = 0.99
+SCORE_DECIMALS = 2
 AgentFn = Callable[[Observation], FeedAction | Dict[str, Any]]
 
 
 def safe_score(score: float) -> float:
     # Keep all grader outputs strictly inside (0, 1).
     return max(MIN_SCORE, min(MAX_SCORE, float(score)))
+
+
+def _score_value(value: float) -> float:
+    return round(float(value), SCORE_DECIMALS)
 
 
 def _default_agent(obs: Observation) -> FeedAction | Dict[str, Any]:
@@ -121,7 +126,7 @@ def grade_task_easy(
     m = result["metrics"]
     penalties = 0.08 * result["unsafe_events"] + 0.04 * result["loop_penalties"]
     score = 0.60 * m["engagement"] + 0.40 * (1.0 - m["addiction_level"]) - penalties
-    return round(safe_score(score), 4)
+    return _score_value(safe_score(score))
 
 
 def grade_task_medium(
@@ -134,7 +139,7 @@ def grade_task_medium(
     m = result["metrics"]
     penalties = 0.08 * result["unsafe_events"] + 0.05 * result["loop_penalties"]
     score = 0.45 * m["engagement"] + 0.45 * m["productivity"] + 0.10 * result["diversity"] - penalties
-    return round(safe_score(score), 4)
+    return _score_value(safe_score(score))
 
 
 def grade_task_hard(
@@ -147,7 +152,7 @@ def grade_task_hard(
     m = result["metrics"]
     penalties = 0.12 * result["unsafe_events"] + 0.05 * result["loop_penalties"]
     score = 0.30 * m["engagement"] + 0.25 * m["productivity"] + 0.45 * m["wellbeing"] - penalties
-    return round(safe_score(score), 4)
+    return _score_value(safe_score(score))
 
 
 # Aliases used by validators that expect short grader names.
@@ -177,5 +182,5 @@ def grade_all(
 ) -> Dict[str, float]:
     agent_fn, seed = _resolve_compat_kwargs(agent_fn, seed, kwargs)
     scores = {task_id: grader(agent_fn, seed=seed) for task_id, grader in GRADERS.items()}
-    scores["overall"] = round(safe_score(sum(scores.values()) / len(GRADERS)), 4)
+    scores["overall"] = _score_value(safe_score(sum(scores.values()) / len(GRADERS)))
     return scores

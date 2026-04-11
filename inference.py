@@ -28,7 +28,8 @@ MODEL = MODEL_NAME
 
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 MIN_SCORE = 0.1
-MAX_SCORE = 0.9
+MAX_SCORE = 0.99
+SCORE_DECIMALS = 2
 TASK_GRADER_PATHS = {
     "easy": "graders.grade_easy",
     "medium": "graders.grade_medium",
@@ -52,6 +53,10 @@ def _strict_score(value: float) -> float:
     return max(MIN_SCORE, min(MAX_SCORE, float(value)))
 
 
+def _score_value(value: float) -> float:
+    return round(float(value), SCORE_DECIMALS)
+
+
 def log_start(task: str, env: str, model: str, grader: str | None = None) -> None:
     payload: Dict[str, Any] = {"task": task, "env": env, "model": model}
     if grader:
@@ -65,7 +70,7 @@ def log_step(step: int, action: str, reward: float, done: bool, error: str | Non
         {
             "step": step,
             "action": action,
-            "reward": round(float(reward), 4),
+            "reward": _score_value(reward),
             "done": bool(done),
             "error": error,
         },
@@ -86,8 +91,8 @@ def log_end(
     payload: Dict[str, Any] = {
         "success": bool(success),
         "steps": int(steps),
-        "score": round(float(score), 4),
-        "rewards": [round(float(r), 4) for r in rewards],
+        "score": _score_value(score),
+        "rewards": [_score_value(r) for r in rewards],
     }
     if task:
         payload["task"] = task
@@ -98,11 +103,11 @@ def log_end(
     if tasks:
         payload["tasks"] = tasks
     if task_scores:
-        payload["task_scores"] = {k: round(float(v), 4) for k, v in task_scores.items()}
+        payload["task_scores"] = {k: _score_value(v) for k, v in task_scores.items()}
         # Flatten common score keys for simpler validator extraction.
         for key in ("easy", "medium", "hard", "overall"):
             if key in task_scores:
-                payload[key] = round(float(task_scores[key]), 4)
+                payload[key] = _score_value(task_scores[key])
     _emit("END", payload)
 
 
@@ -293,7 +298,7 @@ def _run_task(task_id: str, seed: int = 42, step_offset: int = 0) -> tuple[float
     else:
         score = 0.30 * metrics["engagement"] + 0.25 * metrics["productivity"] + 0.45 * metrics["wellbeing"] - (0.12 * unsafe + 0.05 * loops)
 
-    return round(_strict_score(score), 4), safety_guard, rewards
+    return _score_value(_strict_score(score)), safety_guard, rewards
 
 
 def main() -> None:
@@ -327,7 +332,7 @@ def main() -> None:
                 )
             except Exception as exc:
                 task_errors.append(f"{task_id}: {exc}")
-                fallback_score = round(_strict_score(scores.get(task_id, MIN_SCORE)), 4)
+                fallback_score = _score_value(_strict_score(scores.get(task_id, MIN_SCORE)))
                 scores[task_id] = fallback_score
                 _debug(f"Task {task_id} failed: {exc}")
                 log_end(
@@ -341,7 +346,7 @@ def main() -> None:
                     error=str(exc),
                 )
     finally:
-        overall = round(_strict_score((scores["easy"] + scores["medium"] + scores["hard"]) / 3.0), 4)
+        overall = _score_value(_strict_score((scores["easy"] + scores["medium"] + scores["hard"]) / 3.0))
         scores["overall"] = overall
 
         try:
@@ -357,7 +362,7 @@ def main() -> None:
             {
                 "id": task_id,
                 "grader": TASK_GRADER_PATHS[task_id],
-                "score": round(float(scores[task_id]), 4),
+                "score": _score_value(scores[task_id]),
             }
             for task_id in ("easy", "medium", "hard")
         ]
@@ -373,10 +378,10 @@ def main() -> None:
         )
 
         if VALUES_ONLY_OUTPUT:
-            print(f"{scores['easy']:.4f}")
-            print(f"{scores['medium']:.4f}")
-            print(f"{scores['hard']:.4f}")
-            print(f"{scores['overall']:.4f}")
+            print(f"{scores['easy']:.2f}")
+            print(f"{scores['medium']:.2f}")
+            print(f"{scores['hard']:.2f}")
+            print(f"{scores['overall']:.2f}")
 
 
 if __name__ == "__main__":
