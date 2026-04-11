@@ -13,6 +13,8 @@ MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.1-8B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ENV_URL = os.getenv("ENV_URL", "http://localhost:7860").rstrip("/")
+VALUES_ONLY_OUTPUT = os.getenv("VALUES_ONLY_OUTPUT", "0") == "1"
+INFERENCE_DEBUG = os.getenv("INFERENCE_DEBUG", "0") == "1"
 
 API_KEY = HF_TOKEN or OPENAI_API_KEY
 
@@ -35,8 +37,15 @@ TASK_GRADER_PATHS = {
 
 
 def _emit(tag: str, payload: Dict[str, Any]) -> None:
+    if VALUES_ONLY_OUTPUT:
+        return
     # Structured stdout logs for evaluator parsing.
     print(f"[{tag}] {json.dumps(payload, separators=(',', ':'), ensure_ascii=True)}")
+
+
+def _debug(message: str) -> None:
+    if INFERENCE_DEBUG and not VALUES_ONLY_OUTPUT:
+        print(f"[DEBUG] {message}", flush=True)
 
 
 def _strict_score(value: float) -> float:
@@ -113,10 +122,7 @@ def _request_with_retry(
             response = requests.request(method, url, timeout=timeout, **kwargs)
             if response.status_code >= 400:
                 if response.status_code in RETRYABLE_STATUS_CODES and attempt < max_attempts:
-                    print(
-                        f"[DEBUG] HTTP {response.status_code} from {path}; retry {attempt}/{max_attempts}",
-                        flush=True,
-                    )
+                    _debug(f"HTTP {response.status_code} from {path}; retry {attempt}/{max_attempts}")
                     time.sleep(backoff_seconds * (2 ** (attempt - 1)))
                     continue
                 response.raise_for_status()
@@ -129,10 +135,7 @@ def _request_with_retry(
         ) as exc:
             if attempt >= max_attempts:
                 raise
-            print(
-                f"[DEBUG] Request failure on {path}: {exc}; retry {attempt}/{max_attempts}",
-                flush=True,
-            )
+            _debug(f"Request failure on {path}: {exc}; retry {attempt}/{max_attempts}")
             time.sleep(backoff_seconds * (2 ** (attempt - 1)))
 
     raise RuntimeError(f"Unreachable retry branch for {method} {path}")
@@ -238,7 +241,7 @@ def _llm_action(obs: Dict[str, Any]) -> Dict[str, Any]:
         data.setdefault("rationale", "")
         return data
     except Exception as exc:
-        print(f"[DEBUG] Model request failed: {exc}", flush=True)
+        _debug(f"Model request failed: {exc}")
         return _heuristic_action(obs)
 
 
@@ -304,7 +307,7 @@ def main() -> None:
         try:
             _request_with_retry("GET", "/health", timeout=15, max_attempts=3)
         except Exception as exc:
-            print(f"[DEBUG] Health check failed, continuing run: {exc}", flush=True)
+            _debug(f"Health check failed, continuing run: {exc}")
 
         for task_id in ["easy", "medium", "hard"]:
             grader_path = TASK_GRADER_PATHS[task_id]
@@ -326,7 +329,7 @@ def main() -> None:
                 task_errors.append(f"{task_id}: {exc}")
                 fallback_score = round(_strict_score(scores.get(task_id, MIN_SCORE)), 4)
                 scores[task_id] = fallback_score
-                print(f"[DEBUG] Task {task_id} failed: {exc}", flush=True)
+                _debug(f"Task {task_id} failed: {exc}")
                 log_end(
                     success=False,
                     steps=0,
@@ -345,10 +348,10 @@ def main() -> None:
             with open("baseline_scores.json", "w", encoding="utf-8") as f:
                 json.dump(scores, f, indent=2)
         except Exception as exc:
-            print(f"[DEBUG] Failed to write baseline_scores.json: {exc}", flush=True)
+            _debug(f"Failed to write baseline_scores.json: {exc}")
 
         if task_errors:
-            print(f"[DEBUG] Partial run errors: {' | '.join(task_errors)}", flush=True)
+            _debug(f"Partial run errors: {' | '.join(task_errors)}")
 
         tasks_payload = [
             {
@@ -369,7 +372,11 @@ def main() -> None:
             tasks=tasks_payload,
         )
 
-        print(f"[SUMMARY] {json.dumps(scores, separators=(',', ':'), ensure_ascii=True)}")
+        if VALUES_ONLY_OUTPUT:
+            print(f"{scores['easy']:.4f}")
+            print(f"{scores['medium']:.4f}")
+            print(f"{scores['hard']:.4f}")
+            print(f"{scores['overall']:.4f}")
 
 
 if __name__ == "__main__":
