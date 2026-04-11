@@ -61,6 +61,7 @@ def log_end(
     score: float,
     rewards: list[float],
     task_scores: Dict[str, float] | None = None,
+    task: str | None = None,
 ) -> None:
     payload: Dict[str, Any] = {
         "success": bool(success),
@@ -68,8 +69,14 @@ def log_end(
         "score": round(float(score), 4),
         "rewards": [round(float(r), 4) for r in rewards],
     }
+    if task:
+        payload["task"] = task
     if task_scores:
         payload["task_scores"] = {k: round(float(v), 4) for k, v in task_scores.items()}
+        # Flatten common score keys for simpler validator extraction.
+        for key in ("easy", "medium", "hard", "overall"):
+            if key in task_scores:
+                payload[key] = round(float(task_scores[key]), 4)
     _emit("END", payload)
 
 
@@ -286,15 +293,31 @@ def main() -> None:
             print(f"[DEBUG] Health check failed, continuing run: {exc}", flush=True)
 
         for task_id in ["easy", "medium", "hard"]:
+            log_start(task=task_id, env=benchmark, model=MODEL)
+            task_success = True
+            task_steps = 0
+            task_rewards: list[float] = []
             try:
                 score, steps_taken, rewards = _run_task(task_id=task_id, seed=42, step_offset=total_steps)
                 scores[task_id] = score
                 total_steps += steps_taken
                 all_step_rewards.extend(rewards)
+                task_steps = steps_taken
+                task_rewards = rewards
             except Exception as exc:
+                task_success = False
                 task_errors.append(f"{task_id}: {exc}")
                 scores[task_id] = round(_strict_score(scores.get(task_id, MIN_SCORE)), 4)
                 print(f"[DEBUG] Task {task_id} failed: {exc}", flush=True)
+            finally:
+                log_end(
+                    success=task_success,
+                    steps=task_steps,
+                    score=scores[task_id],
+                    rewards=task_rewards,
+                    task_scores={task_id: scores[task_id]},
+                    task=task_id,
+                )
     finally:
         overall = round(_strict_score((scores["easy"] + scores["medium"] + scores["hard"]) / 3.0), 4)
         scores["overall"] = overall
@@ -310,7 +333,7 @@ def main() -> None:
 
         # Success threshold for summary logging only.
         success = overall >= 0.2 and not task_errors
-        log_end(success=success, steps=total_steps, score=overall, rewards=all_step_rewards, task_scores=scores)
+        log_end(success=success, steps=total_steps, score=overall, rewards=all_step_rewards, task_scores=scores, task=task_name)
 
 
 if __name__ == "__main__":
